@@ -11,6 +11,7 @@ This project provides a small policy enforcement gateway that sits between OpenC
 - Stores and manages **upstream credentials** (e.g., Canvas bearer token).
 - Includes a **web UI** to:
   - add/edit upstream APIs,
+  - edit upstream base URLs after creation,
   - rotate/update upstream API tokens,
   - delete upstream APIs and individual permission rules,
   - define permission rules,
@@ -62,6 +63,7 @@ The service listens on `http://localhost:8080` in both options. Data is persiste
 ## Canvas default setup
 
 On first boot, a default `canvas` upstream API is seeded with read-oriented rules and high-risk rules disabled by default.
+If you delete it later, it will **not** be recreated on restart.
 
 1. Open UI.
 2. Locate **canvas**.

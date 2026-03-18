@@ -144,6 +144,26 @@ async function updateApiToken(id) {
   }
 }
 
+async function updateApiBaseUrl(id) {
+  const input = document.getElementById(`base-url-input-${id}`);
+  if (!input) {
+    return;
+  }
+  const baseUrl = input.value.trim();
+  if (!baseUrl) {
+    alert("Enter a base URL first.");
+    return;
+  }
+
+  try {
+    await requestJSON(`/api/apis/${id}`, "PATCH", { base_url: baseUrl });
+    alert("Upstream base URL updated.");
+    location.reload();
+  } catch (err) {
+    alert(`Unable to update URL: ${err.message}`);
+  }
+}
+
 async function deleteClient(id, name) {
   if (!confirm(`Delete internal client "${name}"?`)) {
     return;
@@ -230,6 +250,7 @@ window.togglePermission = togglePermission;
 window.deleteApi = deleteApi;
 window.deletePermission = deletePermission;
 window.updateApiToken = updateApiToken;
+window.updateApiBaseUrl = updateApiBaseUrl;
 window.toggleClient = toggleClient;
 window.deleteClient = deleteClient;
 window.grantReadonlyNow = grantReadonlyNow;

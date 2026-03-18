@@ -52,6 +52,17 @@
           </div>
           <div class="input-group input-group-sm mt-2">
             <input
+              class="form-control"
+              id="base-url-input-{{ api.id }}"
+              value="{{ api.base_url }}"
+              placeholder="https://example.com/api/v1/"
+            >
+            <button class="btn btn-outline-primary" type="button" onclick="updateApiBaseUrl({{ api.id }})">
+              Update URL
+            </button>
+          </div>
+          <div class="input-group input-group-sm mt-2">
+            <input
               type="password"
               class="form-control"
               id="token-input-{{ api.id }}"

@@ -15,7 +15,15 @@ from sqlalchemy import desc, text
 from sqlalchemy.orm import Session, joinedload
 
 from .database import Base, SessionLocal, engine, get_db
-from .models import AdminUser, AuditLog, ApiPermission, ClientPermission, ExternalAPI, InternalClient
+from .models import (
+    AdminUser,
+    AppSetting,
+    AuditLog,
+    ApiPermission,
+    ClientPermission,
+    ExternalAPI,
+    InternalClient,
+)
 from .security import (
     generate_api_key,
     hash_key,
@@ -59,6 +67,10 @@ def migrate_schema() -> None:
 def seed_defaults() -> None:
     db = SessionLocal()
     try:
+        seeded_flag = db.query(AppSetting).filter_by(key="seeded_canvas_v1").first()
+        if seeded_flag:
+            return
+
         canvas = db.query(ExternalAPI).filter_by(name="canvas").first()
         if not canvas:
             canvas = ExternalAPI(
@@ -91,7 +103,9 @@ def seed_defaults() -> None:
                         enabled=(risk == "low"),
                     )
                 )
-            db.commit()
+
+        db.merge(AppSetting(key="seeded_canvas_v1", value="1"))
+        db.commit()
     finally:
         db.close()
 
@@ -476,6 +490,8 @@ async def update_api(api_id: int, request: Request, db: Session = Depends(get_db
         raise HTTPException(status_code=404, detail="API not found")
     api.enabled = bool(payload.get("enabled", api.enabled))
     api.readonly_mode = bool(payload.get("readonly_mode", api.readonly_mode))
+    if "base_url" in payload and payload["base_url"].strip():
+        api.base_url = payload["base_url"].strip().rstrip("/") + "/"
     if "auth_token" in payload and payload["auth_token"].strip():
         api.auth_token = payload["auth_token"].strip()
     db.commit()
