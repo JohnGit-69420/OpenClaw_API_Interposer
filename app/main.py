@@ -1,24 +1,40 @@
 from __future__ import annotations
 
 from fnmatch import fnmatch
+import os
 from typing import Any
 from urllib.parse import urljoin
 
 import httpx
 from fastapi import Depends, FastAPI, Header, HTTPException, Request
-from fastapi.responses import HTMLResponse, JSONResponse
+from fastapi.responses import HTMLResponse, JSONResponse, RedirectResponse
 from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
+from starlette.middleware.sessions import SessionMiddleware
 from sqlalchemy import desc, text
 from sqlalchemy.orm import Session, joinedload
 
 from .database import Base, SessionLocal, engine, get_db
-from .models import AuditLog, ApiPermission, ClientPermission, ExternalAPI, InternalClient
-from .security import generate_api_key, hash_key, mask_secret
+from .models import AdminUser, AuditLog, ApiPermission, ClientPermission, ExternalAPI, InternalClient
+from .security import (
+    generate_api_key,
+    hash_key,
+    hash_password,
+    mask_secret,
+    validate_admin_username,
+    validate_strong_password,
+    verify_password,
+)
 
 app = FastAPI(title="OpenClaw API Permission Manager")
 app.mount("/static", StaticFiles(directory="static"), name="static")
 templates = Jinja2Templates(directory="templates")
+app.add_middleware(
+    SessionMiddleware,
+    secret_key=os.getenv("WEBUI_SESSION_SECRET", "replace-this-session-secret"),
+    same_site="lax",
+    https_only=False,
+)
 
 
 @app.on_event("startup")
@@ -129,8 +145,26 @@ def has_client_permission(client: InternalClient, permission: ApiPermission) -> 
     return False
 
 
+def current_admin(request: Request, db: Session) -> AdminUser | None:
+    admin_id = request.session.get("admin_user_id")
+    if not admin_id:
+        return None
+    return db.query(AdminUser).filter_by(id=admin_id, active=True).first()
+
+
+def ensure_admin(request: Request, db: Session) -> AdminUser:
+    admin = current_admin(request, db)
+    if not admin:
+        raise HTTPException(status_code=401, detail="Web UI login required")
+    return admin
+
+
 @app.get("/", response_class=HTMLResponse)
 def index(request: Request, db: Session = Depends(get_db)):
+    admin = current_admin(request, db)
+    if not admin:
+        return RedirectResponse(url="/login", status_code=303)
+
     apis = db.query(ExternalAPI).options(joinedload(ExternalAPI.permissions)).all()
     clients = db.query(InternalClient).options(joinedload(InternalClient.permissions)).all()
     logs = db.query(AuditLog).order_by(desc(AuditLog.timestamp)).limit(30).all()
@@ -142,12 +176,64 @@ def index(request: Request, db: Session = Depends(get_db)):
             "clients": clients,
             "logs": logs,
             "mask_secret": mask_secret,
+            "admin_username": admin.username,
         },
     )
 
 
+@app.get("/login", response_class=HTMLResponse)
+def login_page(request: Request, db: Session = Depends(get_db)):
+    if current_admin(request, db):
+        return RedirectResponse(url="/", status_code=303)
+    has_users = db.query(AdminUser).count() > 0
+    return templates.TemplateResponse(
+        request,
+        "login.html",
+        {"has_users": has_users},
+    )
+
+
+@app.post("/auth/setup")
+async def create_initial_admin(request: Request, db: Session = Depends(get_db)):
+    if db.query(AdminUser).count() > 0:
+        raise HTTPException(status_code=400, detail="Initial admin already exists")
+
+    payload = await request.json()
+    username = payload["username"].strip()
+    password = payload["password"]
+    validate_admin_username(username)
+    validate_strong_password(password, username=username)
+
+    user = AdminUser(username=username, password_hash=hash_password(password), active=True)
+    db.add(user)
+    db.commit()
+    db.refresh(user)
+    request.session["admin_user_id"] = user.id
+    return {"ok": True}
+
+
+@app.post("/auth/login")
+async def login(request: Request, db: Session = Depends(get_db)):
+    payload = await request.json()
+    username = payload["username"].strip()
+    password = payload["password"]
+
+    user = db.query(AdminUser).filter_by(username=username, active=True).first()
+    if not user or not verify_password(password, user.password_hash):
+        raise HTTPException(status_code=401, detail="Invalid credentials")
+    request.session["admin_user_id"] = user.id
+    return {"ok": True}
+
+
+@app.post("/auth/logout")
+def logout(request: Request):
+    request.session.clear()
+    return {"ok": True}
+
+
 @app.get("/api/state")
-def state(db: Session = Depends(get_db)) -> dict[str, Any]:
+def state(request: Request, db: Session = Depends(get_db)) -> dict[str, Any]:
+    ensure_admin(request, db)
     apis = db.query(ExternalAPI).options(joinedload(ExternalAPI.permissions)).all()
     clients = db.query(InternalClient).options(joinedload(InternalClient.permissions)).all()
     return {
@@ -189,6 +275,7 @@ def state(db: Session = Depends(get_db)) -> dict[str, Any]:
 
 @app.post("/api/apis")
 async def create_api(request: Request, db: Session = Depends(get_db)) -> dict[str, Any]:
+    ensure_admin(request, db)
     payload = await request.json()
     api = ExternalAPI(
         name=payload["name"].strip(),
@@ -204,7 +291,8 @@ async def create_api(request: Request, db: Session = Depends(get_db)) -> dict[st
 
 
 @app.delete("/api/apis/{api_id}")
-def delete_api(api_id: int, db: Session = Depends(get_db)) -> dict[str, Any]:
+def delete_api(api_id: int, request: Request, db: Session = Depends(get_db)) -> dict[str, Any]:
+    ensure_admin(request, db)
     api = db.query(ExternalAPI).filter_by(id=api_id).first()
     if not api:
         raise HTTPException(status_code=404, detail="API not found")
@@ -215,6 +303,7 @@ def delete_api(api_id: int, db: Session = Depends(get_db)) -> dict[str, Any]:
 
 @app.post("/api/permissions")
 async def create_permission(request: Request, db: Session = Depends(get_db)) -> dict[str, Any]:
+    ensure_admin(request, db)
     payload = await request.json()
     permission = ApiPermission(
         api_id=int(payload["api_id"]),
@@ -230,7 +319,10 @@ async def create_permission(request: Request, db: Session = Depends(get_db)) -> 
 
 
 @app.delete("/api/permissions/{permission_id}")
-def delete_permission(permission_id: int, db: Session = Depends(get_db)) -> dict[str, Any]:
+def delete_permission(
+    permission_id: int, request: Request, db: Session = Depends(get_db)
+) -> dict[str, Any]:
+    ensure_admin(request, db)
     permission = db.query(ApiPermission).filter_by(id=permission_id).first()
     if not permission:
         raise HTTPException(status_code=404, detail="Permission not found")
@@ -241,6 +333,7 @@ def delete_permission(permission_id: int, db: Session = Depends(get_db)) -> dict
 
 @app.post("/api/clients")
 async def create_client(request: Request, db: Session = Depends(get_db)) -> dict[str, Any]:
+    ensure_admin(request, db)
     payload = await request.json()
     raw_key = generate_api_key()
     auto_grant_readonly = bool(payload.get("auto_grant_readonly", True))
@@ -277,7 +370,10 @@ async def create_client(request: Request, db: Session = Depends(get_db)) -> dict
 
 
 @app.delete("/api/clients/{client_id}")
-def delete_client(client_id: int, db: Session = Depends(get_db)) -> dict[str, Any]:
+def delete_client(
+    client_id: int, request: Request, db: Session = Depends(get_db)
+) -> dict[str, Any]:
+    ensure_admin(request, db)
     client = db.query(InternalClient).filter_by(id=client_id).first()
     if not client:
         raise HTTPException(status_code=404, detail="Client not found")
@@ -287,7 +383,10 @@ def delete_client(client_id: int, db: Session = Depends(get_db)) -> dict[str, An
 
 
 @app.post("/api/clients/{client_id}/rotate-key")
-def rotate_client_key(client_id: int, db: Session = Depends(get_db)) -> dict[str, Any]:
+def rotate_client_key(
+    client_id: int, request: Request, db: Session = Depends(get_db)
+) -> dict[str, Any]:
+    ensure_admin(request, db)
     client = db.query(InternalClient).filter_by(id=client_id).first()
     if not client:
         raise HTTPException(status_code=404, detail="Client not found")
@@ -301,6 +400,7 @@ def rotate_client_key(client_id: int, db: Session = Depends(get_db)) -> dict[str
 
 @app.patch("/api/clients/{client_id}")
 async def update_client(client_id: int, request: Request, db: Session = Depends(get_db)):
+    ensure_admin(request, db)
     payload = await request.json()
     client = db.query(InternalClient).filter_by(id=client_id).first()
     if not client:
@@ -317,6 +417,7 @@ async def update_client(client_id: int, request: Request, db: Session = Depends(
 async def set_client_permissions(
     client_id: int, request: Request, db: Session = Depends(get_db)
 ) -> dict[str, Any]:
+    ensure_admin(request, db)
     payload = await request.json()
     allowed_ids = {int(p) for p in payload.get("permission_ids", [])}
 
@@ -330,7 +431,10 @@ async def set_client_permissions(
 
 
 @app.post("/api/clients/{client_id}/grant-readonly")
-def grant_readonly_defaults(client_id: int, db: Session = Depends(get_db)) -> dict[str, Any]:
+def grant_readonly_defaults(
+    client_id: int, request: Request, db: Session = Depends(get_db)
+) -> dict[str, Any]:
+    ensure_admin(request, db)
     client = db.query(InternalClient).filter_by(id=client_id).first()
     if not client:
         raise HTTPException(status_code=404, detail="Client not found")
@@ -365,6 +469,7 @@ def grant_readonly_defaults(client_id: int, db: Session = Depends(get_db)) -> di
 
 @app.patch("/api/apis/{api_id}")
 async def update_api(api_id: int, request: Request, db: Session = Depends(get_db)):
+    ensure_admin(request, db)
     payload = await request.json()
     api = db.query(ExternalAPI).filter_by(id=api_id).first()
     if not api:
@@ -381,6 +486,7 @@ async def update_api(api_id: int, request: Request, db: Session = Depends(get_db
 async def update_permission(
     permission_id: int, request: Request, db: Session = Depends(get_db)
 ):
+    ensure_admin(request, db)
     payload = await request.json()
     permission = db.query(ApiPermission).filter_by(id=permission_id).first()
     if not permission:

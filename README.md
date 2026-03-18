@@ -32,6 +32,19 @@ uvicorn app.main:app --host 0.0.0.0 --port 8080
 
 Open `http://localhost:8080`.
 
+## Web UI authentication
+
+- The UI now requires an authenticated admin session.
+- On first launch, you must create the initial admin user on `/login`.
+- Username policy:
+  - at least 8 chars
+  - letters, numbers, underscore only
+- Password policy:
+  - at least 14 chars
+  - includes uppercase, lowercase, number, and symbol
+  - cannot contain the username
+- Passwords are stored as salted PBKDF2-SHA256 hashes.
+
 ## Canvas default setup
 
 On first boot, a default `canvas` upstream API is seeded with read-oriented rules and high-risk rules disabled by default.

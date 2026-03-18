@@ -9,11 +9,17 @@
   </head>
   <body>
     <nav class="navbar navbar-dark bg-dark mb-4">
-      <div class="container-fluid">
+      <div class="container-fluid d-flex justify-content-between">
         <span class="navbar-brand mb-0 h1">OpenClaw API Permission Manager</span>
+        {% if admin_username %}
+        <div class="d-flex align-items-center gap-2">
+          <span class="text-white-50 small">Signed in as {{ admin_username }}</span>
+          <button class="btn btn-sm btn-outline-light" onclick="logoutWebUi()">Logout</button>
+        </div>
+        {% endif %}
       </div>
     </nav>
     <main class="container pb-5">{% block content %}{% endblock %}</main>
-    <script src="/static/app.js?v=4"></script>
+    <script src="/static/app.js?v=5"></script>
   </body>
 </html>

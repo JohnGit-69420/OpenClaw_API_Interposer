@@ -4,6 +4,10 @@ async function requestJSON(url, method, payload) {
     headers: { "Content-Type": "application/json" },
     body: payload ? JSON.stringify(payload) : undefined,
   });
+  if (response.status === 401) {
+    window.location.href = "/login";
+    throw new Error("Session expired. Redirecting to login.");
+  }
   if (!response.ok) {
     const err = await response.text();
     throw new Error(err || `Request failed: ${response.status}`);
@@ -216,6 +220,11 @@ function setGrantSelection(triggerButton, mode) {
   });
 }
 
+async function logoutWebUi() {
+  await fetch("/auth/logout", { method: "POST" });
+  window.location.href = "/login";
+}
+
 window.toggleApi = toggleApi;
 window.togglePermission = togglePermission;
 window.deleteApi = deleteApi;
@@ -227,3 +236,4 @@ window.grantReadonlyNow = grantReadonlyNow;
 window.rotateClientKey = rotateClientKey;
 window.copyClientKey = copyClientKey;
 window.setGrantSelection = setGrantSelection;
+window.logoutWebUi = logoutWebUi;
