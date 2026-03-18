@@ -92,6 +92,27 @@ async function togglePermission(id, enabled) {
   }
 }
 
+async function updateApiToken(id) {
+  const input = document.getElementById(`token-input-${id}`);
+  if (!input) {
+    return;
+  }
+  const authToken = input.value.trim();
+  if (!authToken) {
+    alert("Enter a token value first.");
+    return;
+  }
+
+  try {
+    await requestJSON(`/api/apis/${id}`, "PATCH", { auth_token: authToken });
+    alert("Upstream token updated.");
+    input.value = "";
+    location.reload();
+  } catch (err) {
+    alert(`Unable to update token: ${err.message}`);
+  }
+}
+
 async function toggleClient(id, active) {
   try {
     await requestJSON(`/api/clients/${id}`, "PATCH", { active });
@@ -148,6 +169,7 @@ function setGrantSelection(triggerButton, mode) {
 
 window.toggleApi = toggleApi;
 window.togglePermission = togglePermission;
+window.updateApiToken = updateApiToken;
 window.toggleClient = toggleClient;
 window.rotateClientKey = rotateClientKey;
 window.copyClientKey = copyClientKey;

@@ -49,6 +49,17 @@
               <button class="btn btn-sm btn-outline-secondary" onclick="toggleApi({{ api.id }}, 'readonly_mode', {{ 'false' if api.readonly_mode else 'true' }})">Toggle Read-only</button>
             </div>
           </div>
+          <div class="input-group input-group-sm mt-2">
+            <input
+              type="password"
+              class="form-control"
+              id="token-input-{{ api.id }}"
+              placeholder="Paste new token to rotate {{ api.name }} credentials"
+            >
+            <button class="btn btn-outline-primary" type="button" onclick="updateApiToken({{ api.id }})">
+              Update Token
+            </button>
+          </div>
           <hr>
           <div class="small fw-bold mb-1">Permissions</div>
           {% for perm in api.permissions %}

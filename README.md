@@ -11,6 +11,7 @@ This project provides a small policy enforcement gateway that sits between OpenC
 - Stores and manages **upstream credentials** (e.g., Canvas bearer token).
 - Includes a **web UI** to:
   - add/edit upstream APIs,
+  - rotate/update upstream API tokens,
   - define permission rules,
   - create internal keys,
   - rotate/retrieve internal keys later from the client card,
