@@ -203,6 +203,16 @@ async def create_api(request: Request, db: Session = Depends(get_db)) -> dict[st
     return {"ok": True}
 
 
+@app.delete("/api/apis/{api_id}")
+def delete_api(api_id: int, db: Session = Depends(get_db)) -> dict[str, Any]:
+    api = db.query(ExternalAPI).filter_by(id=api_id).first()
+    if not api:
+        raise HTTPException(status_code=404, detail="API not found")
+    db.delete(api)
+    db.commit()
+    return {"ok": True}
+
+
 @app.post("/api/permissions")
 async def create_permission(request: Request, db: Session = Depends(get_db)) -> dict[str, Any]:
     payload = await request.json()
@@ -215,6 +225,16 @@ async def create_permission(request: Request, db: Session = Depends(get_db)) -> 
         enabled=bool(payload.get("enabled", True)),
     )
     db.add(permission)
+    db.commit()
+    return {"ok": True}
+
+
+@app.delete("/api/permissions/{permission_id}")
+def delete_permission(permission_id: int, db: Session = Depends(get_db)) -> dict[str, Any]:
+    permission = db.query(ApiPermission).filter_by(id=permission_id).first()
+    if not permission:
+        raise HTTPException(status_code=404, detail="Permission not found")
+    db.delete(permission)
     db.commit()
     return {"ok": True}
 
@@ -232,6 +252,16 @@ async def create_client(request: Request, db: Session = Depends(get_db)) -> dict
     db.add(client)
     db.commit()
     return {"ok": True, "api_key": raw_key}
+
+
+@app.delete("/api/clients/{client_id}")
+def delete_client(client_id: int, db: Session = Depends(get_db)) -> dict[str, Any]:
+    client = db.query(InternalClient).filter_by(id=client_id).first()
+    if not client:
+        raise HTTPException(status_code=404, detail="Client not found")
+    db.delete(client)
+    db.commit()
+    return {"ok": True}
 
 
 @app.post("/api/clients/{client_id}/rotate-key")

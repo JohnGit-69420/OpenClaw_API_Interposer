@@ -47,6 +47,7 @@
             <div class="d-flex gap-2">
               <button class="btn btn-sm btn-outline-secondary" onclick="toggleApi({{ api.id }}, 'enabled', {{ 'false' if api.enabled else 'true' }})">Toggle Enabled</button>
               <button class="btn btn-sm btn-outline-secondary" onclick="toggleApi({{ api.id }}, 'readonly_mode', {{ 'false' if api.readonly_mode else 'true' }})">Toggle Read-only</button>
+              <button type="button" class="btn btn-sm btn-outline-danger" onclick="deleteApi({{ api.id }}, '{{ api.name }}')">Delete API</button>
             </div>
           </div>
           <div class="input-group input-group-sm mt-2">
@@ -70,6 +71,7 @@
               <span class="badge text-bg-{{ 'success' if perm.enabled else 'secondary' }}">{{ 'on' if perm.enabled else 'off' }}</span>
             </div>
             <button class="btn btn-sm btn-outline-secondary" onclick="togglePermission({{ perm.id }}, {{ 'false' if perm.enabled else 'true' }})">toggle</button>
+            <button type="button" class="btn btn-sm btn-outline-danger" onclick="deletePermission({{ perm.id }})">delete</button>
           </div>
           {% endfor %}
           <form class="perm-form row g-2 mt-2" data-api-id="{{ api.id }}">
@@ -103,6 +105,7 @@
             <div class="d-flex gap-2">
               <button class="btn btn-sm btn-outline-secondary" onclick="toggleClient({{ client.id }}, {{ 'false' if client.active else 'true' }})">Toggle Active</button>
               <button class="btn btn-sm btn-outline-warning" onclick="rotateClientKey({{ client.id }})">Rotate Key</button>
+              <button type="button" class="btn btn-sm btn-outline-danger" onclick="deleteClient({{ client.id }}, '{{ client.name }}')">Delete Client</button>
             </div>
           </div>
 

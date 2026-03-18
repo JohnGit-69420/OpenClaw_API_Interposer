@@ -12,9 +12,11 @@ This project provides a small policy enforcement gateway that sits between OpenC
 - Includes a **web UI** to:
   - add/edit upstream APIs,
   - rotate/update upstream API tokens,
+  - delete upstream APIs and individual permission rules,
   - define permission rules,
   - create internal keys,
   - rotate/retrieve internal keys later from the client card,
+  - delete internal clients,
   - assign grants to each internal client,
   - inspect audit logs.
 

@@ -92,6 +92,30 @@ async function togglePermission(id, enabled) {
   }
 }
 
+async function deleteApi(id, name) {
+  if (!confirm(`Delete external API "${name}" and all its rules/grants?`)) {
+    return;
+  }
+  try {
+    await requestJSON(`/api/apis/${id}`, "DELETE");
+    location.reload();
+  } catch (err) {
+    alert(`Unable to delete API: ${err.message}`);
+  }
+}
+
+async function deletePermission(id) {
+  if (!confirm("Delete this permission rule?")) {
+    return;
+  }
+  try {
+    await requestJSON(`/api/permissions/${id}`, "DELETE");
+    location.reload();
+  } catch (err) {
+    alert(`Unable to delete permission: ${err.message}`);
+  }
+}
+
 async function updateApiToken(id) {
   const input = document.getElementById(`token-input-${id}`);
   if (!input) {
@@ -110,6 +134,18 @@ async function updateApiToken(id) {
     location.reload();
   } catch (err) {
     alert(`Unable to update token: ${err.message}`);
+  }
+}
+
+async function deleteClient(id, name) {
+  if (!confirm(`Delete internal client "${name}"?`)) {
+    return;
+  }
+  try {
+    await requestJSON(`/api/clients/${id}`, "DELETE");
+    location.reload();
+  } catch (err) {
+    alert(`Unable to delete client: ${err.message}`);
   }
 }
 
@@ -169,8 +205,11 @@ function setGrantSelection(triggerButton, mode) {
 
 window.toggleApi = toggleApi;
 window.togglePermission = togglePermission;
+window.deleteApi = deleteApi;
+window.deletePermission = deletePermission;
 window.updateApiToken = updateApiToken;
 window.toggleClient = toggleClient;
+window.deleteClient = deleteClient;
 window.rotateClientKey = rotateClientKey;
 window.copyClientKey = copyClientKey;
 window.setGrantSelection = setGrantSelection;
