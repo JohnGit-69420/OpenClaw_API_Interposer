@@ -21,8 +21,6 @@ from .security import (
     hash_key,
     hash_password,
     mask_secret,
-    validate_admin_username,
-    validate_strong_password,
     verify_password,
 )
 
@@ -201,8 +199,10 @@ async def create_initial_admin(request: Request, db: Session = Depends(get_db)):
     payload = await request.json()
     username = payload["username"].strip()
     password = payload["password"]
-    validate_admin_username(username)
-    validate_strong_password(password, username=username)
+    if not username:
+        raise HTTPException(status_code=400, detail="Username cannot be empty")
+    if not password:
+        raise HTTPException(status_code=400, detail="Password cannot be empty")
 
     user = AdminUser(username=username, password_hash=hash_password(password), active=True)
     db.add(user)

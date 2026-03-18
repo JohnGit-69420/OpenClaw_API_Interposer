@@ -3,7 +3,6 @@ from __future__ import annotations
 import base64
 import hashlib
 import hmac
-import re
 import secrets
 
 
@@ -44,25 +43,3 @@ def verify_password(password: str, encoded: str) -> bool:
     except Exception:
         return False
 
-
-def validate_admin_username(username: str) -> None:
-    if len(username) < 8:
-        raise ValueError("Username must be at least 8 characters long.")
-    if not re.fullmatch(r"[A-Za-z0-9_]+", username):
-        raise ValueError("Username may only include letters, numbers, and underscores.")
-
-
-def validate_strong_password(password: str, *, username: str | None = None) -> None:
-    if len(password) < 14:
-        raise ValueError("Password must be at least 14 characters long.")
-    checks = [
-        (r"[A-Z]", "one uppercase letter"),
-        (r"[a-z]", "one lowercase letter"),
-        (r"[0-9]", "one number"),
-        (r"[^A-Za-z0-9]", "one symbol"),
-    ]
-    for pattern, label in checks:
-        if not re.search(pattern, password):
-            raise ValueError(f"Password must include at least {label}.")
-    if username and username.lower() in password.lower():
-        raise ValueError("Password cannot contain the username.")

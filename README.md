@@ -36,13 +36,6 @@ Open `http://localhost:8080`.
 
 - The UI now requires an authenticated admin session.
 - On first launch, you must create the initial admin user on `/login`.
-- Username policy:
-  - at least 8 chars
-  - letters, numbers, underscore only
-- Password policy:
-  - at least 14 chars
-  - includes uppercase, lowercase, number, and symbol
-  - cannot contain the username
 - Passwords are stored as salted PBKDF2-SHA256 hashes.
 
 ## Canvas default setup
