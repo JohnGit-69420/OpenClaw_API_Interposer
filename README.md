@@ -32,6 +32,27 @@ uvicorn app.main:app --host 0.0.0.0 --port 8080
 
 Open `http://localhost:8080`.
 
+## Run with Docker
+
+### Option A: Docker directly
+
+```bash
+docker build -t openclaw-api-interposer:latest .
+docker run --name openclaw-api-interposer \
+  -p 8080:8080 \
+  -e WEBUI_SESSION_SECRET='replace-with-a-long-random-secret' \
+  -v "$(pwd)/data:/app/data" \
+  openclaw-api-interposer:latest
+```
+
+### Option B: docker compose
+
+```bash
+docker compose up --build -d
+```
+
+The service listens on `http://localhost:8080` in both options. Data is persisted in `./data` on the host.
+
 ## Web UI authentication
 
 - The UI now requires an authenticated admin session.

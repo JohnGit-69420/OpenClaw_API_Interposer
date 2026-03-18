@@ -1,0 +1,13 @@
+services:
+  interposer:
+    build: .
+    image: openclaw-api-interposer:latest
+    container_name: openclaw-api-interposer
+    ports:
+      - "8080:8080"
+    environment:
+      WEBUI_SESSION_SECRET: "replace-with-long-random-secret"
+      PORT: "8080"
+    volumes:
+      - ./data:/app/data
+    restart: unless-stopped
