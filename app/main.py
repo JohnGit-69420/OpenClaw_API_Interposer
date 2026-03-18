@@ -9,7 +9,7 @@ from fastapi import Depends, FastAPI, Header, HTTPException, Request
 from fastapi.responses import HTMLResponse, JSONResponse
 from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
-from sqlalchemy import desc
+from sqlalchemy import desc, text
 from sqlalchemy.orm import Session, joinedload
 
 from .database import Base, SessionLocal, engine, get_db
@@ -24,7 +24,22 @@ templates = Jinja2Templates(directory="templates")
 @app.on_event("startup")
 def setup_db() -> None:
     Base.metadata.create_all(bind=engine)
+    migrate_schema()
     seed_defaults()
+
+
+def migrate_schema() -> None:
+    db = SessionLocal()
+    try:
+        columns = {
+            row[1]
+            for row in db.execute(text("PRAGMA table_info('internal_clients')")).fetchall()
+        }
+        if "api_key_value" not in columns:
+            db.execute(text("ALTER TABLE internal_clients ADD COLUMN api_key_value TEXT"))
+            db.commit()
+    finally:
+        db.close()
 
 
 def seed_defaults() -> None:
@@ -164,6 +179,7 @@ def state(db: Session = Depends(get_db)) -> dict[str, Any]:
                 "id": c.id,
                 "name": c.name,
                 "active": c.active,
+                "api_key_value": c.api_key_value,
                 "permission_ids": [cp.permission_id for cp in c.permissions if cp.allowed],
             }
             for c in clients
@@ -208,11 +224,41 @@ async def create_client(request: Request, db: Session = Depends(get_db)) -> dict
     payload = await request.json()
     raw_key = generate_api_key()
     client = InternalClient(
-        name=payload["name"].strip(), api_key_hash=hash_key(raw_key), active=True
+        name=payload["name"].strip(),
+        api_key_hash=hash_key(raw_key),
+        api_key_value=raw_key,
+        active=True,
     )
     db.add(client)
     db.commit()
     return {"ok": True, "api_key": raw_key}
+
+
+@app.post("/api/clients/{client_id}/rotate-key")
+def rotate_client_key(client_id: int, db: Session = Depends(get_db)) -> dict[str, Any]:
+    client = db.query(InternalClient).filter_by(id=client_id).first()
+    if not client:
+        raise HTTPException(status_code=404, detail="Client not found")
+
+    raw_key = generate_api_key()
+    client.api_key_hash = hash_key(raw_key)
+    client.api_key_value = raw_key
+    db.commit()
+    return {"ok": True, "api_key": raw_key}
+
+
+@app.patch("/api/clients/{client_id}")
+async def update_client(client_id: int, request: Request, db: Session = Depends(get_db)):
+    payload = await request.json()
+    client = db.query(InternalClient).filter_by(id=client_id).first()
+    if not client:
+        raise HTTPException(status_code=404, detail="Client not found")
+    if "active" in payload:
+        client.active = bool(payload["active"])
+    if "name" in payload and payload["name"].strip():
+        client.name = payload["name"].strip()
+    db.commit()
+    return {"ok": True}
 
 
 @app.post("/api/clients/{client_id}/permissions")

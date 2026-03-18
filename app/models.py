@@ -55,6 +55,7 @@ class InternalClient(Base):
     id: Mapped[int] = mapped_column(Integer, primary_key=True)
     name: Mapped[str] = mapped_column(String(120), unique=True, nullable=False)
     api_key_hash: Mapped[str] = mapped_column(String(128), nullable=False)
+    api_key_value: Mapped[str | None] = mapped_column(Text, nullable=True)
     active: Mapped[bool] = mapped_column(Boolean, default=True, nullable=False)
 
     permissions: Mapped[list[ClientPermission]] = relationship(

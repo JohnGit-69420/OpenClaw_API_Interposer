@@ -9,3 +9,11 @@ code {
 .card {
   border: 0;
 }
+
+.form-check-label {
+  line-height: 1.5;
+}
+
+input[readonly] {
+  background: #fff;
+}

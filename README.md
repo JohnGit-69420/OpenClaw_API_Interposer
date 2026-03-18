@@ -13,6 +13,7 @@ This project provides a small policy enforcement gateway that sits between OpenC
   - add/edit upstream APIs,
   - define permission rules,
   - create internal keys,
+  - rotate/retrieve internal keys later from the client card,
   - assign grants to each internal client,
   - inspect audit logs.
 
@@ -58,7 +59,7 @@ Otherwise the request is denied and logged.
 
 ## Notes
 
-- Current secret storage is plaintext in SQLite; place this app behind host-level protections and encrypted disk.
+- Current secret storage is plaintext in SQLite (including retrievable internal client keys); place this app behind host-level protections and encrypted disk.
 - For production hardening, add:
   - encrypted secrets (KMS/Vault),
   - RBAC + login for UI,

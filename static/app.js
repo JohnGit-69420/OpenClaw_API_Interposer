@@ -1,21 +1,8 @@
-async function postJSON(url, payload) {
+async function requestJSON(url, method, payload) {
   const response = await fetch(url, {
-    method: "POST",
+    method,
     headers: { "Content-Type": "application/json" },
-    body: JSON.stringify(payload),
-  });
-  if (!response.ok) {
-    const err = await response.text();
-    throw new Error(err || `Request failed: ${response.status}`);
-  }
-  return response.json();
-}
-
-async function patchJSON(url, payload) {
-  const response = await fetch(url, {
-    method: "PATCH",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify(payload),
+    body: payload ? JSON.stringify(payload) : undefined,
   });
   if (!response.ok) {
     const err = await response.text();
@@ -28,7 +15,7 @@ document.getElementById("api-form")?.addEventListener("submit", async (e) => {
   e.preventDefault();
   const form = e.target;
   try {
-    await postJSON("/api/apis", {
+    await requestJSON("/api/apis", "POST", {
       name: form.name.value,
       base_url: form.base_url.value,
       auth_token: form.auth_token.value,
@@ -45,7 +32,7 @@ document.querySelectorAll(".perm-form").forEach((form) => {
   form.addEventListener("submit", async (e) => {
     e.preventDefault();
     try {
-      await postJSON("/api/permissions", {
+      await requestJSON("/api/permissions", "POST", {
         api_id: form.dataset.apiId,
         name: form.name.value,
         method: form.method.value,
@@ -64,12 +51,9 @@ document.getElementById("client-form")?.addEventListener("submit", async (e) => 
   e.preventDefault();
   const form = e.target;
   try {
-    const data = await postJSON("/api/clients", { name: form.name.value });
-    const keyBox = document.getElementById("new-key-box");
-    keyBox.classList.remove("d-none");
-    keyBox.innerHTML = `<strong>Copy this key now.</strong><br><code>${data.api_key}</code>`;
-    form.reset();
-    setTimeout(() => location.reload(), 800);
+    const data = await requestJSON("/api/clients", "POST", { name: form.name.value });
+    alert(`Client created. API key:\n\n${data.api_key}\n\nThis key is also visible in the client card.`);
+    location.reload();
   } catch (err) {
     alert(`Unable to create client: ${err.message}`);
   }
@@ -80,10 +64,10 @@ document.querySelectorAll(".grant-form").forEach((form) => {
     e.preventDefault();
     const selected = [...form.querySelectorAll("input[name='permission_ids']:checked")].map((el) => Number(el.value));
     try {
-      await postJSON(`/api/clients/${form.dataset.clientId}/permissions`, {
+      await requestJSON(`/api/clients/${form.dataset.clientId}/permissions`, "POST", {
         permission_ids: selected,
       });
-      location.reload();
+      alert("Grants updated.");
     } catch (err) {
       alert(`Unable to save grants: ${err.message}`);
     }
@@ -92,7 +76,7 @@ document.querySelectorAll(".grant-form").forEach((form) => {
 
 async function toggleApi(id, field, value) {
   try {
-    await patchJSON(`/api/apis/${id}`, { [field]: value });
+    await requestJSON(`/api/apis/${id}`, "PATCH", { [field]: value });
     location.reload();
   } catch (err) {
     alert(`Unable to update API: ${err.message}`);
@@ -101,12 +85,70 @@ async function toggleApi(id, field, value) {
 
 async function togglePermission(id, enabled) {
   try {
-    await patchJSON(`/api/permissions/${id}`, { enabled });
+    await requestJSON(`/api/permissions/${id}`, "PATCH", { enabled });
     location.reload();
   } catch (err) {
     alert(`Unable to update permission: ${err.message}`);
   }
 }
 
+async function toggleClient(id, active) {
+  try {
+    await requestJSON(`/api/clients/${id}`, "PATCH", { active });
+    location.reload();
+  } catch (err) {
+    alert(`Unable to update client: ${err.message}`);
+  }
+}
+
+async function rotateClientKey(id) {
+  if (!confirm("Rotate this key? Existing integrations using the old key will stop working.")) {
+    return;
+  }
+  try {
+    const data = await requestJSON(`/api/clients/${id}/rotate-key`, "POST");
+    alert(`New key:\n\n${data.api_key}\n\nThe UI will refresh and keep this key visible.`);
+    location.reload();
+  } catch (err) {
+    alert(`Unable to rotate key: ${err.message}`);
+  }
+}
+
+async function copyClientKey(id) {
+  const input = document.getElementById(`client-key-${id}`);
+  if (!input) {
+    return;
+  }
+  try {
+    await navigator.clipboard.writeText(input.value);
+    alert("API key copied to clipboard.");
+  } catch {
+    input.select();
+    document.execCommand("copy");
+    alert("API key copied.");
+  }
+}
+
+function setGrantSelection(triggerButton, mode) {
+  const form = triggerButton.closest("form");
+  if (!form) {
+    return;
+  }
+  const checkboxes = [...form.querySelectorAll("input[name='permission_ids']")];
+  checkboxes.forEach((checkbox) => {
+    if (mode === "all") {
+      checkbox.checked = true;
+    } else if (mode === "none") {
+      checkbox.checked = false;
+    } else {
+      checkbox.checked = ["GET", "HEAD", "OPTIONS"].includes((checkbox.dataset.method || "").toUpperCase());
+    }
+  });
+}
+
 window.toggleApi = toggleApi;
 window.togglePermission = togglePermission;
+window.toggleClient = toggleClient;
+window.rotateClientKey = rotateClientKey;
+window.copyClientKey = copyClientKey;
+window.setGrantSelection = setGrantSelection;
