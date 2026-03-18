@@ -93,6 +93,10 @@
         <form id="client-form" class="row g-2 mb-3">
           <div class="col-8"><input required name="name" class="form-control" placeholder="client name (e.g. openclaw)"></div>
           <div class="col-4"><button class="btn btn-primary btn-sm">Create client</button></div>
+          <div class="col-12 form-check mt-1">
+            <input type="checkbox" class="form-check-input" id="auto-grant-readonly" name="auto_grant_readonly" checked>
+            <label class="form-check-label" for="auto-grant-readonly">Auto-grant enabled read-only rules (recommended)</label>
+          </div>
         </form>
 
         {% for client in clients %}
@@ -122,7 +126,14 @@
               <button type="button" class="btn btn-sm btn-outline-secondary" onclick="setGrantSelection(this, 'readonly')">Select read-only</button>
               <button type="button" class="btn btn-sm btn-outline-secondary" onclick="setGrantSelection(this, 'all')">Select all</button>
               <button type="button" class="btn btn-sm btn-outline-secondary" onclick="setGrantSelection(this, 'none')">Clear all</button>
+              <button type="button" class="btn btn-sm btn-outline-success" onclick="grantReadonlyNow({{ client.id }})">Grant read-only now</button>
             </div>
+
+            {% if client.permissions|length == 0 %}
+            <div class="alert alert-warning py-2 small">
+              This client currently has <strong>no granted rules</strong>, so all proxied calls will be denied.
+            </div>
+            {% endif %}
 
             {% for api in apis %}
             <div class="border rounded p-2 mb-2">

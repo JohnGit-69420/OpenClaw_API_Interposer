@@ -243,6 +243,7 @@ def delete_permission(permission_id: int, db: Session = Depends(get_db)) -> dict
 async def create_client(request: Request, db: Session = Depends(get_db)) -> dict[str, Any]:
     payload = await request.json()
     raw_key = generate_api_key()
+    auto_grant_readonly = bool(payload.get("auto_grant_readonly", True))
     client = InternalClient(
         name=payload["name"].strip(),
         api_key_hash=hash_key(raw_key),
@@ -250,8 +251,29 @@ async def create_client(request: Request, db: Session = Depends(get_db)) -> dict
         active=True,
     )
     db.add(client)
+    db.flush()
+
+    if auto_grant_readonly:
+        readonly_perms = (
+            db.query(ApiPermission)
+            .join(ExternalAPI, ExternalAPI.id == ApiPermission.api_id)
+            .filter(
+                ApiPermission.enabled.is_(True),
+                ApiPermission.method.in_({"GET", "HEAD", "OPTIONS"}),
+                ExternalAPI.enabled.is_(True),
+            )
+            .all()
+        )
+        for perm in readonly_perms:
+            db.add(
+                ClientPermission(
+                    client_id=client.id,
+                    permission_id=perm.id,
+                    allowed=True,
+                )
+            )
     db.commit()
-    return {"ok": True, "api_key": raw_key}
+    return {"ok": True, "api_key": raw_key, "auto_granted_readonly": auto_grant_readonly}
 
 
 @app.delete("/api/clients/{client_id}")
@@ -305,6 +327,40 @@ async def set_client_permissions(
         )
     db.commit()
     return {"ok": True}
+
+
+@app.post("/api/clients/{client_id}/grant-readonly")
+def grant_readonly_defaults(client_id: int, db: Session = Depends(get_db)) -> dict[str, Any]:
+    client = db.query(InternalClient).filter_by(id=client_id).first()
+    if not client:
+        raise HTTPException(status_code=404, detail="Client not found")
+
+    readonly_perms = (
+        db.query(ApiPermission)
+        .join(ExternalAPI, ExternalAPI.id == ApiPermission.api_id)
+        .filter(
+            ApiPermission.enabled.is_(True),
+            ApiPermission.method.in_({"GET", "HEAD", "OPTIONS"}),
+            ExternalAPI.enabled.is_(True),
+        )
+        .all()
+    )
+    readonly_ids = {perm.id for perm in readonly_perms}
+    existing = {
+        cp.permission_id
+        for cp in db.query(ClientPermission).filter_by(client_id=client_id, allowed=True).all()
+    }
+
+    for permission_id in sorted(readonly_ids - existing):
+        db.add(
+            ClientPermission(
+                client_id=client_id,
+                permission_id=permission_id,
+                allowed=True,
+            )
+        )
+    db.commit()
+    return {"ok": True, "granted_count": len(readonly_ids - existing)}
 
 
 @app.patch("/api/apis/{api_id}")

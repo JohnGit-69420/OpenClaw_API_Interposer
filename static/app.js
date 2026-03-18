@@ -51,7 +51,10 @@ document.getElementById("client-form")?.addEventListener("submit", async (e) => 
   e.preventDefault();
   const form = e.target;
   try {
-    const data = await requestJSON("/api/clients", "POST", { name: form.name.value });
+    const data = await requestJSON("/api/clients", "POST", {
+      name: form.name.value,
+      auto_grant_readonly: form.auto_grant_readonly.checked,
+    });
     alert(`Client created. API key:\n\n${data.api_key}\n\nThis key is also visible in the client card.`);
     location.reload();
   } catch (err) {
@@ -149,6 +152,16 @@ async function deleteClient(id, name) {
   }
 }
 
+async function grantReadonlyNow(id) {
+  try {
+    const data = await requestJSON(`/api/clients/${id}/grant-readonly`, "POST");
+    alert(`Granted ${data.granted_count} read-only rules.`);
+    location.reload();
+  } catch (err) {
+    alert(`Unable to grant read-only rules: ${err.message}`);
+  }
+}
+
 async function toggleClient(id, active) {
   try {
     await requestJSON(`/api/clients/${id}`, "PATCH", { active });
@@ -210,6 +223,7 @@ window.deletePermission = deletePermission;
 window.updateApiToken = updateApiToken;
 window.toggleClient = toggleClient;
 window.deleteClient = deleteClient;
+window.grantReadonlyNow = grantReadonlyNow;
 window.rotateClientKey = rotateClientKey;
 window.copyClientKey = copyClientKey;
 window.setGrantSelection = setGrantSelection;

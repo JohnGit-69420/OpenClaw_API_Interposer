@@ -15,6 +15,7 @@ This project provides a small policy enforcement gateway that sits between OpenC
   - delete upstream APIs and individual permission rules,
   - define permission rules,
   - create internal keys,
+  - auto-grant read-only rules on client creation (optional),
   - rotate/retrieve internal keys later from the client card,
   - delete internal clients,
   - assign grants to each internal client,
