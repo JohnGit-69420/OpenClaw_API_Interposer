@@ -1,0 +1,78 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Web UI Login</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.7/dist/css/bootstrap.min.css" rel="stylesheet">
+    <style>body{background:#f3f5f8;}</style>
+  </head>
+  <body>
+    <main class="container py-5" style="max-width:560px;">
+      <div class="card shadow-sm">
+        <div class="card-body">
+          <h4 class="mb-3">OpenClaw API Permission Manager</h4>
+
+          {% if has_users %}
+          <p class="text-muted">Sign in with your admin account.</p>
+          <form id="login-form" class="row g-2">
+            <div class="col-12"><input name="username" class="form-control" placeholder="username" required></div>
+            <div class="col-12"><input name="password" type="password" class="form-control" placeholder="password" required></div>
+            <div class="col-12"><button class="btn btn-primary w-100">Login</button></div>
+          </form>
+          {% else %}
+          <p class="text-muted">No admin exists yet. Create the first admin account.</p>
+          <form id="setup-form" class="row g-2">
+            <div class="col-12"><input name="username" class="form-control" placeholder="username" required></div>
+            <div class="col-12"><input name="password" type="password" class="form-control" placeholder="password" required></div>
+            <div class="col-12"><button class="btn btn-success w-100">Create admin & sign in</button></div>
+          </form>
+          {% endif %}
+          <div id="login-error" class="alert alert-danger mt-3 d-none"></div>
+        </div>
+      </div>
+    </main>
+
+    <script>
+      async function submitJson(url, payload) {
+        const res = await fetch(url, {
+          method: 'POST',
+          headers: {'Content-Type':'application/json'},
+          body: JSON.stringify(payload),
+        });
+        if (!res.ok) {
+          const text = await res.text();
+          throw new Error(text || `Request failed (${res.status})`);
+        }
+      }
+
+      function showError(msg) {
+        const box = document.getElementById('login-error');
+        box.classList.remove('d-none');
+        box.textContent = msg;
+      }
+
+      document.getElementById('login-form')?.addEventListener('submit', async (e) => {
+        e.preventDefault();
+        const form = e.target;
+        try {
+          await submitJson('/auth/login', {username: form.username.value, password: form.password.value});
+          location.href = '/';
+        } catch (err) {
+          showError(err.message);
+        }
+      });
+
+      document.getElementById('setup-form')?.addEventListener('submit', async (e) => {
+        e.preventDefault();
+        const form = e.target;
+        try {
+          await submitJson('/auth/setup', {username: form.username.value, password: form.password.value});
+          location.href = '/';
+        } catch (err) {
+          showError(err.message);
+        }
+      });
+    </script>
+  </body>
+</html>

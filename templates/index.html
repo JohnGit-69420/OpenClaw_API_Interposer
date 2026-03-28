@@ -1,0 +1,202 @@
+{% extends "base.html" %}
+{% block content %}
+<div class="row g-4">
+  <div class="col-12">
+    <div class="card shadow-sm">
+      <div class="card-body">
+        <h5>Quick start</h5>
+        <ol class="mb-0">
+          <li>Add an upstream API (Canvas is pre-seeded).</li>
+          <li>Define permission rules (method + path pattern).</li>
+          <li>Create internal clients (OpenClaw, scripts, bots).</li>
+          <li>Grant each client only the rules it should use.</li>
+          <li>Call <code>/v1/proxy/{api}/{path}</code> with <code>X-Interposer-Key</code>.</li>
+        </ol>
+      </div>
+    </div>
+  </div>
+
+  <div class="col-lg-6">
+    <div class="card shadow-sm h-100">
+      <div class="card-header">External APIs</div>
+      <div class="card-body">
+        <form id="api-form" class="row g-2 mb-3">
+          <div class="col-6"><input required name="name" class="form-control" placeholder="api name (e.g. canvas)"></div>
+          <div class="col-6"><input required name="base_url" class="form-control" placeholder="https://.../api/v1/"></div>
+          <div class="col-6"><input required name="auth_token" class="form-control" placeholder="bearer token"></div>
+          <div class="col-3 form-check mt-2">
+            <input type="checkbox" class="form-check-input" name="enabled" checked>
+            <label class="form-check-label">Enabled</label>
+          </div>
+          <div class="col-3 form-check mt-2">
+            <input type="checkbox" class="form-check-input" name="readonly_mode" checked>
+            <label class="form-check-label">Read-only</label>
+          </div>
+          <div class="col-12"><button class="btn btn-primary btn-sm">Add API</button></div>
+        </form>
+
+        {% for api in apis %}
+        <div class="border rounded p-2 mb-3">
+          <div class="d-flex justify-content-between align-items-center flex-wrap gap-2">
+            <div>
+              <strong>{{ api.name }}</strong> <small class="text-muted">{{ api.base_url }}</small><br>
+              <span class="badge text-bg-{{ 'success' if api.enabled else 'secondary' }}">{{ 'Enabled' if api.enabled else 'Disabled' }}</span>
+              <span class="badge text-bg-{{ 'info' if api.readonly_mode else 'warning' }}">{{ 'Read-only' if api.readonly_mode else 'Write enabled' }}</span>
+              <span class="badge text-bg-dark">Token: {{ mask_secret(api.auth_token) }}</span>
+            </div>
+            <div class="d-flex gap-2">
+              <button class="btn btn-sm btn-outline-secondary" onclick="toggleApi({{ api.id }}, 'enabled', {{ 'false' if api.enabled else 'true' }})">Toggle Enabled</button>
+              <button class="btn btn-sm btn-outline-secondary" onclick="toggleApi({{ api.id }}, 'readonly_mode', {{ 'false' if api.readonly_mode else 'true' }})">Toggle Read-only</button>
+              <button type="button" class="btn btn-sm btn-outline-danger" onclick="deleteApi({{ api.id }}, '{{ api.name }}')">Delete API</button>
+            </div>
+          </div>
+          <div class="input-group input-group-sm mt-2">
+            <input
+              class="form-control"
+              id="base-url-input-{{ api.id }}"
+              value="{{ api.base_url }}"
+              placeholder="https://example.com/api/v1/"
+            >
+            <button class="btn btn-outline-primary" type="button" onclick="updateApiBaseUrl({{ api.id }})">
+              Update URL
+            </button>
+          </div>
+          <div class="input-group input-group-sm mt-2">
+            <input
+              type="password"
+              class="form-control"
+              id="token-input-{{ api.id }}"
+              placeholder="Paste new token to rotate {{ api.name }} credentials"
+            >
+            <button class="btn btn-outline-primary" type="button" onclick="updateApiToken({{ api.id }})">
+              Update Token
+            </button>
+          </div>
+          <hr>
+          <div class="small fw-bold mb-1">Permissions</div>
+          {% for perm in api.permissions %}
+          <div class="d-flex justify-content-between align-items-center border rounded p-1 mb-1">
+            <div>
+              <code>{{ perm.method }} {{ perm.path_pattern }}</code> — {{ perm.name }}
+              <span class="badge text-bg-{{ 'danger' if perm.risk == 'high' else 'success' }}">{{ perm.risk }}</span>
+              <span class="badge text-bg-{{ 'success' if perm.enabled else 'secondary' }}">{{ 'on' if perm.enabled else 'off' }}</span>
+            </div>
+            <button class="btn btn-sm btn-outline-secondary" onclick="togglePermission({{ perm.id }}, {{ 'false' if perm.enabled else 'true' }})">toggle</button>
+            <button type="button" class="btn btn-sm btn-outline-danger" onclick="deletePermission({{ perm.id }})">delete</button>
+          </div>
+          {% endfor %}
+          <form class="perm-form row g-2 mt-2" data-api-id="{{ api.id }}">
+            <div class="col-md-4"><input required name="name" class="form-control form-control-sm" placeholder="Rule name"></div>
+            <div class="col-md-2"><input required name="method" class="form-control form-control-sm" value="GET"></div>
+            <div class="col-md-4"><input required name="path_pattern" class="form-control form-control-sm" placeholder="courses/*/assignments*"></div>
+            <div class="col-md-2"><button class="btn btn-sm btn-primary">Add rule</button></div>
+          </form>
+        </div>
+        {% endfor %}
+      </div>
+    </div>
+  </div>
+
+  <div class="col-lg-6">
+    <div class="card shadow-sm h-100">
+      <div class="card-header">Internal Clients & Grants</div>
+      <div class="card-body">
+        <form id="client-form" class="row g-2 mb-3">
+          <div class="col-8"><input required name="name" class="form-control" placeholder="client name (e.g. openclaw)"></div>
+          <div class="col-4"><button class="btn btn-primary btn-sm">Create client</button></div>
+          <div class="col-12 form-check mt-1">
+            <input type="checkbox" class="form-check-input" id="auto-grant-readonly" name="auto_grant_readonly" checked>
+            <label class="form-check-label" for="auto-grant-readonly">Auto-grant enabled read-only rules (recommended)</label>
+          </div>
+        </form>
+
+        {% for client in clients %}
+        <div class="border rounded p-3 mb-3">
+          <div class="d-flex justify-content-between align-items-start flex-wrap gap-2">
+            <div>
+              <strong>{{ client.name }}</strong>
+              <span class="badge text-bg-{{ 'success' if client.active else 'secondary' }}">{{ 'Active' if client.active else 'Inactive' }}</span>
+            </div>
+            <div class="d-flex gap-2">
+              <button class="btn btn-sm btn-outline-secondary" onclick="toggleClient({{ client.id }}, {{ 'false' if client.active else 'true' }})">Toggle Active</button>
+              <button class="btn btn-sm btn-outline-warning" onclick="rotateClientKey({{ client.id }})">Rotate Key</button>
+              <button type="button" class="btn btn-sm btn-outline-danger" onclick="deleteClient({{ client.id }}, '{{ client.name }}')">Delete Client</button>
+            </div>
+          </div>
+
+          <div class="mt-2 mb-2">
+            <label class="form-label mb-1 small text-muted">Internal API Key (always accessible)</label>
+            <div class="input-group input-group-sm">
+              <input class="form-control" id="client-key-{{ client.id }}" readonly value="{{ client.api_key_value or 'Legacy client (no retrievable key stored). Rotate key to generate one.' }}">
+              <button class="btn btn-outline-primary" type="button" onclick="copyClientKey({{ client.id }})">Copy</button>
+            </div>
+          </div>
+
+          <form class="grant-form mt-2" data-client-id="{{ client.id }}">
+            <div class="d-flex gap-2 mb-2 flex-wrap">
+              <button type="button" class="btn btn-sm btn-outline-secondary" onclick="setGrantSelection(this, 'readonly')">Select read-only</button>
+              <button type="button" class="btn btn-sm btn-outline-secondary" onclick="setGrantSelection(this, 'all')">Select all</button>
+              <button type="button" class="btn btn-sm btn-outline-secondary" onclick="setGrantSelection(this, 'none')">Clear all</button>
+              <button type="button" class="btn btn-sm btn-outline-success" onclick="grantReadonlyNow({{ client.id }})">Grant read-only now</button>
+            </div>
+
+            {% if client.permissions|length == 0 %}
+            <div class="alert alert-warning py-2 small">
+              This client currently has <strong>no granted rules</strong>, so all proxied calls will be denied.
+            </div>
+            {% endif %}
+
+            {% for api in apis %}
+            <div class="border rounded p-2 mb-2">
+              <div class="fw-semibold mb-1">{{ api.name }}</div>
+              {% for perm in api.permissions %}
+              <label class="form-check-label d-block small">
+                <input
+                  class="form-check-input me-1"
+                  type="checkbox"
+                  name="permission_ids"
+                  value="{{ perm.id }}"
+                  data-method="{{ perm.method }}"
+                  {% for grant in client.permissions %}{% if grant.permission_id == perm.id and grant.allowed %}checked{% endif %}{% endfor %}
+                >
+                <code>{{ perm.method }} {{ perm.path_pattern }}</code> — {{ perm.name }}
+                <span class="badge text-bg-{{ 'danger' if perm.risk == 'high' else 'success' }}">{{ perm.risk }}</span>
+                <span class="badge text-bg-{{ 'success' if perm.enabled else 'secondary' }}">{{ 'enabled' if perm.enabled else 'disabled-rule' }}</span>
+              </label>
+              {% endfor %}
+            </div>
+            {% endfor %}
+
+            <button class="btn btn-sm btn-outline-primary mt-2">Save grants</button>
+          </form>
+        </div>
+        {% endfor %}
+      </div>
+    </div>
+  </div>
+
+  <div class="col-12">
+    <div class="card shadow-sm">
+      <div class="card-header">Recent audit log</div>
+      <div class="card-body table-responsive">
+        <table class="table table-sm">
+          <thead><tr><th>Time (UTC)</th><th>Client</th><th>API</th><th>Request</th><th>Decision</th><th>Reason</th><th>Upstream</th></tr></thead>
+          <tbody>
+          {% for entry in logs %}
+            <tr>
+              <td>{{ entry.timestamp }}</td>
+              <td>{{ entry.client_name }}</td>
+              <td>{{ entry.api_name }}</td>
+              <td><code>{{ entry.method }} {{ entry.path }}</code></td>
+              <td><span class="badge text-bg-{{ 'success' if entry.decision == 'allow' else 'danger' }}">{{ entry.decision }}</span></td>
+              <td>{{ entry.reason }}</td>
+              <td>{{ entry.upstream_status }}</td>
+            </tr>
+          {% endfor %}
+          </tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+</div>
+{% endblock %}
